@@ -1,3 +1,8 @@
+"""
+Author: George Uttley
+Date: 18/01/22
+"""
+
 import ROOT
 import json
 from collections import OrderedDict
@@ -8,13 +13,25 @@ ROOT.gROOT.SetBatch(1)
 class ScoreSFTool:
 
   def __init__(self):
-
+    """                                                                                                 
+    **TauPOG.TauIDSFs.ScoreSFTool** contains tau ID score reweighting algorithms                        
+                                                                                                        
+    Allows for easy movement between data effiencies, mc efficiences and SFs as well as number of       
+    operations on each efficiency to be performed. Also contains plotting functions to help 
+    visualise the problem.                                                                                        
+    """ 
     self.histograms_od = OrderedDict()
     self.spline_od = OrderedDict()
     self.sorted_wp = list()
     self.rebinned_bins = OrderedDict()
 
   def CheckType(self,input_type):
+    """
+    Check type of input and give print error statement.
+
+    :param input_type: Type of histograms given to algorithm
+    :return: Returns true or false depending on if the input type is correct
+    """
     if input_type not in ["mc","data","sf"]:
       print "ERROR: Input type must be either mc, data or sf"
       return False
@@ -22,7 +39,12 @@ class ScoreSFTool:
       return True
       
   def InputHistograms(self,hists,input_type):
-  
+    """  
+    Input an ordered dictionary of histograms and their type to the algorithm to store in class.
+
+    :param hists: Ordered dictionary of ROOT 1D histograms
+    :param input_type: Type of histograms given to algorithm
+    """
     if not self.CheckType(input_type): return None
 
     self.histograms_od[input_type] = copy.deepcopy(hists)
@@ -38,7 +60,11 @@ class ScoreSFTool:
           del self.histograms_od[input_type][wp]
        
   def GetSortedWPs(self,hists):
+    """
+    Sort working points given to algorithm and save to class.
 
+    :param hists: Ordered dictionary of ROOT 1D histograms with WP named keys
+    """
     loose_keys = list()
     medium_keys = list()
     tight_keys = list()
@@ -57,7 +83,11 @@ class ScoreSFTool:
     self.sorted_wp = loose_keys + medium_keys + tight_keys
 
   def CalculateHistograms(self,output_type):
-  
+    """
+    Calculate the output_type from the other two out of mc, data and sf.
+
+    :param output_type: Type of histograms you want to calculate  
+    """
     if not self.CheckType(output_type): return None
 
     search_keys = ["mc","data","sf"]
@@ -86,6 +116,11 @@ class ScoreSFTool:
         self.histograms_od["sf"][k].Divide(self.histograms_od["mc"][k])
 
   def PrintHistograms(self,print_type=["mc","data","sf"]):
+    """
+    Print the histograms stored in class.
+
+    :param print_type: Type of histograms to calculate print, can be list of string.
+    """
     if type(print_type) == str: print_type = [print_type]
     
     for tk, tv in self.histograms_od.iteritems():    
@@ -94,8 +129,14 @@ class ScoreSFTool:
         for hk, hv in tv.iteritems():
           hv.Print("all")
 
-  def ScaleHistogramsByHistogram(self,input_type,hist, divide=False):
+  def ScaleHistogramsByHistogram(self,input_type,hist,divide=False):
+    """
+    Scale histograms of a certain type up or down by a single histogram.
 
+    :param input_type: Type of histograms to scale
+    :parm hist: Histogram to scale by
+    :param divide: Set true to divide instead of multiply
+    """
     for k,v in self.histograms_od[input_type].iteritems():
       if not divide:
         self.histograms_od[input_type][k].Multiply(hist)
@@ -103,22 +144,39 @@ class ScoreSFTool:
         self.histograms_od[input_type][k].Divide(hist)
     
   def GetHistograms(self,output_type):
+    """
+    Return ordered dictionary of histograms from class.
 
+    :param output_type: Type of histograms to return
+    :return: Ordered dictionary of histograms
+    """
     return copy.deepcopy(self.histograms_od[output_type])
 
   def GetHistogram(self,output_type,key):
-
+    """                                                                                             
+    Return specific histogram from class.                                             
+                                                                                                    
+    :param output_type: Type of histograms to get specific one
+    :param key: Name of specific histogram
+    :return: Histogram requested                                                       
+    """
     return copy.deepcopy(self.histograms_od[output_type][key])
 
   def ConvertToWPBinnedHistograms(self,rebin_threshold=0.1):
-    
+    """                                                                                             
+    Convert WP histograms in bins of a variable. To variable histograms in bins of the WP.                                                           
+                                                                                                    
+    :param rebin_threshold: All WP bins will contain an efficiency greater than this threshold. If
+                            they do not, then it is merged with the adjacent WP bin.
+    """ 
     temp_histograms_od = OrderedDict()
     temp_histograms_od["data"] = OrderedDict()
     temp_histograms_od["mc"] = OrderedDict()
 
     h = list(self.histograms_od["sf"].items())[0][1]
     bins = [[h.GetBinLowEdge(i),h.GetBinLowEdge(i+1)] for i in range(1,h.GetNbinsX()+1)] 
-    
+  
+ 
     # get data efficiencies first
     eff_bin_data_val = OrderedDict()
     eff_bin_wp = OrderedDict()
@@ -134,6 +192,14 @@ class ScoreSFTool:
         else:
           eff_bin_data_val[bin_name].append(self.histograms_od["data"][wp].GetBinContent(bin_number))
           eff_bin_wp[bin_name].append(self.sorted_wp[ind])
+
+    # Remove any 0 bins
+    for b in copy.deepcopy(bins):
+      bin_name = str(b[0]) + "to" + str(b[1])
+      if sum(eff_bin_data_val[bin_name]) == 0:
+        del eff_bin_data_val[bin_name]
+        del eff_bin_wp[bin_name]
+        bins.remove(b)
 
     # rebin
     for k, v in eff_bin_data_val.iteritems():
@@ -157,7 +223,7 @@ class ScoreSFTool:
           bin_number = self.histograms_od[tk][wp].FindBin((b[0]+b[1])/2)
           if ind + 1 != len(eff_bin_wp[bin_name]):
             temp_histograms_od[tk][bin_name].SetBinContent(ind+1, self.histograms_od[tk][wp].GetBinContent(bin_number) - self.histograms_od[tk][eff_bin_wp[bin_name][ind+1]].GetBinContent(bin_number))
-            temp_histograms_od[tk][bin_name].SetBinError(ind+1, (self.histograms_od[tk][wp].GetBinError(bin_number)**2 + self.histograms_od[tk][eff_bin_wp[bin_name][ind+1]].GetBinError(bin_number)**2)**0.5)
+            temp_histograms_od[tk][bin_name].SetBinError(ind+1, (self.histograms_od[tk][wp].GetBinError(bin_number)**2 - self.histograms_od[tk][eff_bin_wp[bin_name][ind+1]].GetBinError(bin_number)**2)**0.5)
           else:
             temp_histograms_od[tk][bin_name].SetBinContent(ind+1, self.histograms_od[tk][wp].GetBinContent(bin_number))
             temp_histograms_od[tk][bin_name].SetBinError(ind+1, self.histograms_od[tk][wp].GetBinError(bin_number))
@@ -167,7 +233,13 @@ class ScoreSFTool:
     self.rebinned_bins = copy.deepcopy(eff_bin_wp)
 
   def ScaleWPHistogramsByHistogram(self,input_type,hist,divide=False):
+    """
+    Scale histograms in bins of WP by a histogram in bins of a variable.
 
+    :param input_type: Type of histograms to scale
+    :param hist: Histogram to scale by
+    :param divide: Set to true to divide by instead of multiply
+    """
     for k,v in self.histograms_od[input_type].iteritems():
       scale_val = hist.GetBinContent(hist.FindBin((float(k.split("to")[0]) + float(k.split("to")[1]))/2))
       if not divide:
@@ -176,6 +248,11 @@ class ScoreSFTool:
         self.histograms_od[input_type][k].Scale(1.0/scale_val)
   
   def ConvertToScoreBinnedHistograms(self,score_dict):
+    """
+    Convert histograms in working point bins to histograms in score bins.
+
+    :param score_dict: Ordered dictionary of WPs to score conversions
+    """
     temp_histograms_od = OrderedDict()
     for tk, tv in self.histograms_od.iteritems():
       temp_histograms_od[tk] = OrderedDict()
@@ -192,12 +269,30 @@ class ScoreSFTool:
     self.histograms_od = copy.deepcopy(temp_histograms_od)
         
   def FitSpline(self,input_type):
+    """
+    Fit splines to an input type of histograms.
+
+    :param input_type: Type of histograms to fit spline for
+    """
     self.spline_od[input_type] = OrderedDict()
     for tk, tv in self.histograms_od["sf"].iteritems():
       self.spline_od[input_type][tk] = ROOT.TSpline3(tv)
 
   def PlotEfficienciesAndSFs(self,logx=True,title_left="",title_right="",x_label="",ratio_range=[0.8,1.2],extra_ratio_line=[0.9,1.1],replace=[],replace_labels=[],individual=None,folder="."):
+    """
+    Plot the stored efficiencies and ratio (scale factor).
 
+    :param logx: Use a log x axis
+    :param title_left: This text will be added to the category on the top left of the plot
+    :param title_right: This text will be added to the top right of the plot
+    :param x_label: Title of x axis
+    :param ratio_range: List of length 2, showing bottom and top of y range in the ratio
+    :param extra_ratio_line: List of where to draw extra ratio lines on.
+    :param replace: List of x labels to replace
+    :param replace_labels: List of replacement x labels
+    :param individual: Draw an individual plot of one category
+    :param folder: Output folder for plot
+    """
     for k,v in self.histograms_od["sf"].iteritems():
       if individual == None or individual == k:
         self.DrawHistogramsWithRatio(
@@ -217,6 +312,16 @@ class ScoreSFTool:
                      )    
 
   def PlotSFs(self,logx=False,title_left="",title_right="",x_label="",with_spline=False,folder="."):
+    """                                                                                             
+    Plot the stored scale factors.                                           
+                                                                                                    
+    :param logx: Use a log x axis                                                                   
+    :param title_left: This text will be added to the category on the top left of the plot          
+    :param title_right: This text will be added to the top right of the plot                        
+    :param x_label: Title of x axis                                                       
+    :param with_spline: Add spline to plot          
+    :param folder: Output folder for plot                                                           
+    """ 
     for k,v in self.histograms_od["sf"].iteritems():
       if with_spline: spline = self.spline_od["sf"][k]
       else: spline = None
@@ -233,28 +338,64 @@ class ScoreSFTool:
                    fit=spline
                    )
 
-  def DumpSFTF2(self):
+  def DumpSFTF2(self,variation="cent"):
+    """
+    Return SF in ROOT.TF2 form from class
+    
+    :param variation: Return cent, up or down uncertainty variation.
+    """
     func_str = "("
     for k,v in self.histograms_od["sf"].iteritems():
 
       if k != self.histograms_od["sf"].keys()[-1]:
-        func_str += "((x>{} && x<={})*(".format(k.split("to")[0],k.split("to")[1])
+        func_str += "((x>={} && x<{})*(".format(k.split("to")[0],k.split("to")[1])
       else:
-        func_str += "((x>{})*(".format(k.split("to")[0])
+        func_str += "((x>={})*(".format(k.split("to")[0])
 
       for ind_wp, wp in enumerate(self.rebinned_bins[k]):
+
+        if variation == "cent":
+          shift = 0
+        elif variation == "up": 
+          shift = v.GetBinError(ind_wp+1)          
+        elif variation == "down":  
+          shift = -v.GetBinError(ind_wp+1) 
+
         if ind_wp + 1 != len(self.rebinned_bins[k]):
-          func_str += "({}*(y>{} && y<={})) + ".format(v.GetBinContent(ind_wp+1),v.GetBinLowEdge(ind_wp+1),v.GetBinLowEdge(ind_wp+2))
+          func_str += "({}*(y>={} && y<{})) + ".format(v.GetBinContent(ind_wp+1)+shift,v.GetBinLowEdge(ind_wp+1),v.GetBinLowEdge(ind_wp+2))
         else:
-          func_str += "({}*(y>{})))) + ".format(v.GetBinContent(ind_wp+1),v.GetBinLowEdge(ind_wp+1))
+          func_str += "({}*(y>={})))) + ".format(v.GetBinContent(ind_wp+1)+shift,v.GetBinLowEdge(ind_wp+1))
 
     func_str = func_str[:-3]+")"
     
-    tf2 = ROOT.TF2("sf",func_str,0.0,1000.0,0.0,1.0)
+    tf2 = ROOT.TF2(variation,func_str,0.0,1000.0,0.0,1.0)
     return tf2
 
   def DrawHistogramsWithRatio(self, hists, titles,x_label="",y_label="",y_ratio_label="",colours=[2,6,42,46,39,49], title_left="", title_right="",ratio_range=[0.8,1.2], extra_ratio_line=[0.9,1.1], save_name="plot", anchor_to_zero=True, logx=True, logy=False,replace=[],replace_labels=[],do_split_ratio_uncert=False,ratio=True,fit=None):
+    """ 
+    Plotting function to draw multipe histograms and their ratios if needed.
 
+    :param hists: List of histograms to plot
+    :param titles: List of titles for histograms to put in legend
+    :param x_label: Title of x axis
+    :param y_label: Title of y axis 
+    :param y_ratio_label: Title of y ratio axis
+    :param colours: List of ROOT colours to use for the histograms
+    :param title_left: This text will be added to the category on the top left of the plot          
+    :param title_right: This text will be added to the top right of the plot                        
+    :param x_label: Title of x axis                                                                 
+    :param ratio_range: List of length 2, showing bottom and top of y range in the ratio            
+    :param extra_ratio_line: List of where to draw extra ratio lines on. 
+    :param save_name: Name of output plot
+    :param anchor_to_zero: Set y range minimum to 0.
+    :param logx: Use a log x axis
+    :param logy: Use a log y axis
+    :param replace: List of x labels to replace                                                     
+    :param replace_labels: List of replacement x labels
+    :param do_split_ratio_uncert: Changes how the rato uncertainty is drawn
+    :param ratio: Add ratio to plot.
+    :param fit: Draw fit on plot.
+    """ 
     c = ROOT.TCanvas('c','c',600,600)
 
     if ratio:
@@ -275,6 +416,8 @@ class ScoreSFTool:
     hists[0].Draw("E")
     hists[0].SetLineColor(1)
     hists[0].SetFillColor(1)
+    hists[0].SetMarkerStyle(2)
+    hists[0].SetLineWidth(1)
     hists[0].SetStats(0)
     hists[0].GetXaxis().SetTitle("")
     hists[0].GetYaxis().SetTitle(y_label)
@@ -293,11 +436,15 @@ class ScoreSFTool:
 
     if ratio: hists[0].GetXaxis().SetLabelSize(0)
 
+    if (not ratio) and logx:
+      hists[0].GetXaxis().SetMoreLogLabels()
+      hists[0].GetXaxis().SetNoExponent()
+
     for ind,val in enumerate(hists[1:]):
       hists[ind+1].Draw("E SAME")
       hists[ind+1].SetMarkerColor(colours[ind])
       hists[ind+1].SetLineColor(colours[ind])
-      hists[ind+1].SetLineWidth(2)
+      hists[ind+1].SetLineWidth(1)
       hists[ind+1].SetMarkerStyle(2)
 
     if fit != None: 
@@ -313,7 +460,7 @@ class ScoreSFTool:
         if h.GetBinError(i) != 0 and h.GetBinContent(i)+h.GetBinError(i) > maximum:
           maximum = h.GetBinContent(i)+h.GetBinError(i)
 
-    hists[0].SetMaximum(1.5*maximum)
+    hists[0].SetMaximum(1.6*maximum) 
     if anchor_to_zero and not logy:
       hists[0].SetMinimum(0.0)
     else:
@@ -325,7 +472,6 @@ class ScoreSFTool:
       for ind,h in enumerate(hists):
         l.AddEntry(hists[ind],titles[ind],"lep")
       l.Draw()
-
 
     if ratio:
       c.cd()
@@ -390,7 +536,6 @@ class ScoreSFTool:
         extra_ratio_l.append(ROOT.TLine(hists[0].GetBinLowEdge(1),i,hists[0].GetBinLowEdge(hists[0].GetNbinsX()+1),i))
         extra_ratio_l[ind].SetLineStyle(3)
         extra_ratio_l[ind].Draw("l same")
-
     if ratio:
       self.DrawTitle(pad1, title_left, 1, scale=1)
       self.DrawTitle(pad1, title_right, 3, scale=1)
@@ -403,6 +548,13 @@ class ScoreSFTool:
     c.Close()
 
   def DrawTitle(self, pad, text, align, scale=1):
+    """
+    Draw title on a ROOT canvas
+    :param pad: Pad to draw titles on
+    :param text: Text to write
+    :param align: Where on canvas you want this to be shown
+    :param scale: Size of title
+    """
     pad_backup = ROOT.gPad
     pad.cd()
     t = pad.GetTopMargin()
@@ -440,6 +592,18 @@ class ScoreSFTool:
     pad_backup.cd()
 
   def ChooseAxisLabels(self,axis,labels,size=0.04,logx=False,pad=None,offset=0.04,replace=[],angle=315):
+    """
+    Change axis tick labels
+
+    :param axis: Axis to change tick labels for
+    :param labels: Labels to show or replace
+    :param size: Size of tick labels
+    :param logx: Is it a log x axis
+    :param pad: Pad of axis.
+    :param offset: Offset for labels compared to axis
+    :param replace: List of replacement names
+    :param angle: Angle to show labels for
+    """
     if replace != [] and len(labels) != len(replace):
       print "Replace and labels are not the same length"
       return
