@@ -22,7 +22,7 @@ More detailed instructions for tau corrections are
   * [Eta-dependent fake rate SFs for the anti-lepton discriminators](#eta-dependent-fake-rate-sfs-for-the-anti-lepton-discriminators)<br>
   * [DM-dependent tau energy scale](#dm-dependent-tau-energy-scale)<br>
   * [Eta- & DM-dependent e -> tau fake energy scale](#eta---dm-dependent-e---tau-fake-energy-scale)<br>
-
+* [SF reweighting to use the score](#sf-reweighting-to-use-the-score)<br>
 
 ## Installation of the tool
 
@@ -253,4 +253,20 @@ fes     = festool.getFES(eta,dm,genmatch)
 fesUp   = festool.getFES(eta,dm,genmatch,unc='Up')
 fesDown = festool.getFES(eta,dm,genmatch,unc='Down')
 ```
+
+### SF reweighting to use the score
+
+To use the score of a tau ID algorithm, WP SFs will not work. 
+However, scale factors from every WP can be combined to produce a SF for everything above the loosest WP.
+This is parameterised by the score in bins of WPs and whatever variable the SFs were originally derived for.
+This follows the method shown in https://indico.cern.ch/event/1238355/contributions/5217619/attachments/2576458/4443172/tauIDscorecorrections.pdf.
+For an analysis to do this, they must provide MC efficiencies of each WP in histograms with bins that match the tau ID SFs.
+Examples of these are shown in data/data/MCEffTauIDScoreCorrections_{pT,DM}.root.
+An example of how to generate the score dependent scale factors is shown below.
+```
+python test/runTauIDScoreCorrections.py --mc_eff="data/MCEffTauIDScoreCorrections_pT.root" --sf="data/TauID_SF_pt_DeepTau2017v2p1VSjet_2017ReReco.root" --var_name="p_{T}" --output_folder="score_reweighting_example_pT" --name="TauIDScoreSF_pT.root" --logx
+```
+This will create a number of plots to demonstrate the method working.
+It will place the TF2s containing the score dependent SFs and their up and down shifts in a ROOT file named score_reweighting_example_pT/TauIDScoreSF_pT.root in this example.
+These can be applied to the analysis with x as the original SF variable and y as the tau ID score. 
 

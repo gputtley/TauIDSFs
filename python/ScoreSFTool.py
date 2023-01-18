@@ -362,9 +362,9 @@ class ScoreSFTool:
           shift = -v.GetBinError(ind_wp+1) 
 
         if ind_wp + 1 != len(self.rebinned_bins[k]):
-          func_str += "({}*(y>={} && y<{})) + ".format(v.GetBinContent(ind_wp+1)+shift,v.GetBinLowEdge(ind_wp+1),v.GetBinLowEdge(ind_wp+2))
+          func_str += "({}*(y>={} && y<{})) + ".format(max(0,v.GetBinContent(ind_wp+1)+shift),v.GetBinLowEdge(ind_wp+1),v.GetBinLowEdge(ind_wp+2))
         else:
-          func_str += "({}*(y>={})))) + ".format(v.GetBinContent(ind_wp+1)+shift,v.GetBinLowEdge(ind_wp+1))
+          func_str += "({}*(y>={})))) + ".format(max(0,v.GetBinContent(ind_wp+1)+shift),v.GetBinLowEdge(ind_wp+1))
 
     func_str = func_str[:-3]+")"
     

@@ -93,8 +93,7 @@ ssf.CalculateHistograms("data")
 ssf.PlotEfficienciesAndSFs(logx=args.logx,x_label=args.var_name,folder=args.output_folder)
 
 ### Convert to WP binned histograms ###
-#ssf.PrintHistograms()
-ssf.ConvertToWPBinnedHistograms()
+ssf.ConvertToWPBinnedHistograms(rebin_threshold=0.1)
 
 # Change bin names and plot
 for k, v in ssf.rebinned_bins.iteritems():
